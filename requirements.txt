@@ -1,0 +1,6 @@
+rtamt
+nav_msgs
+lxml
+launch_ros
+numpy
+catkin_pkg
