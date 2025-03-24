@@ -44,7 +44,7 @@ if ! command -v colcon &> /dev/null; then
 fi
 
 # Build the workspace
-colcon build --packages-select turtlebot3_multi_robot
+colcon build --packages-select mape_k_loop turtlebot3_multi_robot
 
 # Source the workspace setup again to ensure the environment is updated
 source ./install/setup.bash
@@ -62,4 +62,4 @@ if ! command -v ros2 &> /dev/null; then
 fi
 
 # Launch the combined launch file
-ros2 launch turtlebot3_multi_robot gazebo_multi_nav2_world.launch.py
+ros2 launch init_simulation.py

@@ -1,3 +1,6 @@
 [submodule "multi_robot_sim"]
 	path = multi_robot_sim
 	url = git@github.com:xurxonanin/turtlebot3_multi_robot.git
+[submodule "lidar-occlusion"]
+	path = lidar-occlusion
+	url = git@github.com:xurxonanin/Lidar-Occlusion.git
