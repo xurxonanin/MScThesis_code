@@ -11,6 +11,8 @@ import signal
 import numpy as np
 from fractions import Fraction
 from threading import Lock
+from std_msgs.msg import String
+
 try:
     from .lidarocclusion.masks import BoolLidarMask
     from .lidarocclusion.sliding_lidar_masks import sliding_lidar_mask
@@ -62,6 +64,7 @@ class Analyze(Node):
                 cutoff=0.5
             )
         self.scans_mutex = Lock()
+        self.anomaly_topic = self.create_publisher(String, f'anomaly_{self.namespace}', 10)
         
         
 
@@ -77,18 +80,13 @@ class Analyze(Node):
         
         with self.scans_mutex:
             self.scans.append(lidar_info)
-            # Use the sliding_lidar_mask function to get the sliding mask
             sliding_mask = next(self._sliding_lidar_mask)
-            self.get_logger().info(f'sliding_mask: {sliding_mask}')
-            self.get_logger().info(f'sliding_mask: {type(sliding_mask._values)}')
             simulated_occlusion = None
             if self.anomaly_init >= 15:
                 simulated_occlusion = BoolLidarMask(
-                    np.zeros_like(lidar_info.values, dtype=bool),
-                    base_angle= Fraction(1,4) # 1/4 pi radians
-                )
-                self.get_logger().info(f'simulated_occlusion: {simulated_occlusion._values.shape}')
-            
+                    [(0.0, Fraction(1,8)*np.pi)],
+                    base_angle= sliding_mask.base_angle,
+                )            
             ignore_lidar_region = BoolLidarMask(
                 [(3 * np.pi / 4, 5 * np.pi / 4)],
                 sliding_mask.base_angle,
@@ -96,7 +94,7 @@ class Analyze(Node):
 
             sliding_mask  = sliding_mask | ignore_lidar_region
             if simulated_occlusion:
-                sliding_mask = sliding_mask | simulated_occlusion
+                sliding_mask = sliding_mask & simulated_occlusion
             else:
                 sliding_mask = sliding_mask
 
@@ -104,10 +102,13 @@ class Analyze(Node):
                 self.anomaly = False
                 self.anomaly_init += 1
             else:
-                self.get_logger().info(f'sliding_mask: {sliding_mask._values}')
                 self.anomaly = True
-                self.get_logger().info('Anomaly detected')
-
+                self.get_logger().info('Anomaly detected!')
+                self.redis_client.hset(f'anomaly_{self.namespace}', mapping={
+                    'anomaly': json.dumps(True),
+                    'scan': json.dumps(lidar_info)
+                })
+                self.anomaly_topic.publish(String(data=json.dumps(lidar_info)))
             
         
             
