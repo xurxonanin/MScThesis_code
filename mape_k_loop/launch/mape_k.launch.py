@@ -32,8 +32,8 @@ def generate_launch_description():
         nodes.append(
             Node(
                 package='mape_k_loop',
-                executable='planning',
-                name=f'planning_{namespace}',
+                executable='analyze',
+                name=f'analyze{namespace}',
                 namespace=namespace,
                 output='screen',
                 parameters=[{'use_sim_time': True}]

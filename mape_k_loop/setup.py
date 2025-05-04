@@ -24,7 +24,7 @@ setup(
         'console_scripts': [
             'mape_k_loop = mape_k_loop.mape_k_loop:main',
             'monitor = mape_k_loop.monitor:main',
-            'planning = mape_k_loop.planning:main'
+            'analyze = mape_k_loop.analyze:main'
         ],
     },
 )
