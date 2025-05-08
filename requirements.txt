@@ -8,3 +8,5 @@ ipykernel==6.29.4
 matplotlib==3.5.1
 scipy
 redis
+empy==3.3.4 # Templating engine used to generate source from .srv
+lark

@@ -7,6 +7,7 @@ find_package(rclpy REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(nav_msgs REQUIRED)
+find_package(mape_k_interfaces REQUIRED)
 
 # Install Python modules
 ament_python_install_package(${PROJECT_NAME})

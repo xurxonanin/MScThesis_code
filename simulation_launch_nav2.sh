@@ -1,6 +1,11 @@
 #!/bin/bash
 
 # Clean previous executions
+
+# Remove any existing chached elements
+if [ -d __pycache__ ]; then
+  rm -rf __pycache__
+fi
 if [ -d build ]; then
   rm -rf build
 fi
@@ -44,16 +49,25 @@ if ! command -v colcon &> /dev/null; then
 fi
 
 # Build the workspace
-colcon build --packages-select turtlebot3_multi_robot mape_k_loop # --symlink-install
+echo "$(pwd)"
+colcon build --packages-select mape_k_interfaces --cmake-clean-cache
+
+source /opt/ros/humble/setup.bash
+source install/setup.bash
+
+
+colcon build --packages-select mape_k_loop turtlebot3_multi_robot --symlink-install
 
 # Source the workspace setup again to ensure the environment is updated
 source ./install/setup.bash
 
 # Check if a Docker container with the name "mape_k_redis" is already running
-if ! docker ps --filter "name=mape_k_redis" --format "{{.Names}}" | grep -q "^mape_k_redis$"; then
-  docker run -d --name mape_k_redis -p 6379:6379 redis:latest
-else
-  echo "Docker container 'mape_k_redis' is already running. Skipping."
+if docker ps --filter "name=mape_k_redis" --format "{{.Names}}" | grep -q "^mape_k_redis$"; then
+  docker stop mape_k_redis
+  docker rm mape_k_redis
+
+#Launch new Docker container of the Redis image
+docker run -d --name mape_k_redis -p 6379:6379 redis:latest
 fi
 
 # Ensure ROS 2 binaries are in the PATH again

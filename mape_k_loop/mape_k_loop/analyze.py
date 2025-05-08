@@ -1,6 +1,6 @@
 import os
 import sys
-parent_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '.'))
+parent_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 if parent_dir not in sys.path:
     sys.path.insert(0, parent_dir)
 import rclpy
@@ -12,13 +12,14 @@ import numpy as np
 from fractions import Fraction
 from threading import Lock
 from std_msgs.msg import String
+from mape_k_interfaces.srv import CheckAnomaly
 
 try:
     from .lidarocclusion.masks import BoolLidarMask
     from .lidarocclusion.sliding_lidar_masks import sliding_lidar_mask
 except (ValueError, ImportError):
-    from lidarocclusion.masks import BoolLidarMask
-    from lidarocclusion.sliding_lidar_masks import sliding_lidar_mask
+    from mape_k_loop.lidarocclusion.masks import BoolLidarMask
+    from mape_k_loop.lidarocclusion.sliding_lidar_masks import sliding_lidar_mask
 
 
 
@@ -51,6 +52,7 @@ class Analyze(Node):
         self.get_logger().info('Analyze node started')
         self.scans = []
         self.anomaly = False
+        self.anomaly_srv = self.create_service(CheckAnomaly, f'{self.namespace}/check_anomaly', self.check_anomaly_callback)
         self.anomaly_init = 0
 
         def raw_lidar_masks():
@@ -64,9 +66,11 @@ class Analyze(Node):
                 cutoff=0.5
             )
         self.scans_mutex = Lock()
-        self.anomaly_topic = self.create_publisher(String, f'anomaly_{self.namespace}', 10)
+        self.anomaly_topic = self.create_publisher(String, f'{self.namespace}/anomaly', 10)
         
-        
+    def check_anomaly_callback (self, _, response):
+        response.anomaly = self.anomaly
+        return response
 
     # Add a timer callback to periodically read from database
     def read_from_db(self):
