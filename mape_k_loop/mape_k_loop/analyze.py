@@ -13,6 +13,7 @@ from fractions import Fraction
 from threading import Lock
 from std_msgs.msg import String
 from mape_k_interfaces.srv import CheckAnomaly
+from mape_k_loop.base_slave import BaseSlave
 
 try:
     from .lidarocclusion.masks import BoolLidarMask
@@ -31,7 +32,7 @@ def scan_to_mask(scan):
         base_angle=Fraction(2, len(ranges))
     )
 
-class Analyze(Node):
+class Analyze(BaseSlave):
     def __init__(self):
         super().__init__(f'analyze')
         
@@ -48,11 +49,11 @@ class Analyze(Node):
                 exit(0)
 
             signal.signal(signal.SIGINT, stop_execution)
-        self.reader = self.create_timer(0.5,  self.read_from_db)
         self.get_logger().info('Analyze node started')
         self.scans = []
         self.anomaly = False
-        self.anomaly_srv = self.create_service(CheckAnomaly, f'{self.namespace}/check_anomaly', self.check_anomaly_callback)
+        self.get_logger().info(f'Current_namespace: {self.namespace}')
+        self.anomaly_srv = self.create_service(CheckAnomaly, f'/{self.namespace}/check_anomaly', self.check_anomaly_callback)
         self.anomaly_init = 0
 
         def raw_lidar_masks():
@@ -73,7 +74,7 @@ class Analyze(Node):
         return response
 
     # Add a timer callback to periodically read from database
-    def read_from_db(self):
+    def do_task(self):
         current_scan = self.redis_client.hgetall(f'current_map_{self.namespace}')
         if not current_scan:
             self.get_logger().warn('No scan data found in Redis')

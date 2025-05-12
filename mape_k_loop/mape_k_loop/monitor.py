@@ -1,32 +1,49 @@
+import os
+import sys
+parent_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+if parent_dir not in sys.path:
+    sys.path.insert(0, parent_dir)
 import rclpy
 from rclpy.node import Node
 import redis
 from sensor_msgs.msg import LaserScan
 from scipy.spatial.transform import Rotation as R
 from nav_msgs.msg import Odometry
+from std_msgs.msg import String, Bool
 import json
 import math
 from threading import Lock
 import signal
 import sys
+from mape_k_loop.base_slave import BaseSlave
 
-class Monitor(Node):
+class Monitor(BaseSlave):
     def __init__(self):
         super().__init__(f'monitor')
         self.laser_sub = self.create_subscription(LaserScan, 
             'scan',
             self.laser_callback, 
             2
-        )    
-        self.namespace = self.get_namespace().strip('/')
+        )
         
+        self.namespace = self.get_namespace().strip('/')
+        self.create_subscription(
+            String,
+            f'/{self.namespace}/monitor/execution_command',
+            self.command_callback,
+            1
+        )
         self.odom_sub = self.create_subscription(Odometry,
             'odom',
             self.odom_callback, 
             2
         )
         self.get_logger().info(f'/monitor node started')
-
+        self.finished_publisher = self.create_publisher(
+            Bool,
+            f'/{self.namespace}/monitor_finished',
+            1
+        )
         self.redis_client = redis.Redis(host='localhost', port=6379, decode_responses=True)
         self.current_scan = None
         self.current_position = None
@@ -42,9 +59,6 @@ class Monitor(Node):
                 exit(0)
 
             signal.signal(signal.SIGINT, stop_execution)
-
-            
-        self.database_timer = self.create_timer(0.5, self.store_in_database)    
         self.lock = Lock()
         self.get_logger().info('Monitor node started')
 
@@ -96,7 +110,7 @@ class Monitor(Node):
                 # Skip the z axis
                 'theta': theta}
 
-    def store_in_database(self):
+    def do_task(self):
         with self.lock:
             # Store the latest scan and pose in Redis
             if not self.current_scan or not self.current_position:
@@ -120,6 +134,8 @@ class Monitor(Node):
             }
             self.get_logger().info(f'Writing to Redis: {map_to_write}')
             self.redis_client.hset(f'current_map_{self.namespace}', mapping=map_to_write)
+            self.finished_publisher.publish(Bool(data=True))
+            self.get_logger().info('Monitor finished publishing')
         
 
 def main(args=None):

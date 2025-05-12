@@ -49,14 +49,9 @@ if ! command -v colcon &> /dev/null; then
 fi
 
 # Build the workspace
-echo "$(pwd)"
-colcon build --packages-select mape_k_interfaces --cmake-clean-cache
-
-source /opt/ros/humble/setup.bash
-source install/setup.bash
 
 
-colcon build --packages-select mape_k_loop turtlebot3_multi_robot --symlink-install
+colcon build --packages-select mape_k_interfaces mape_k_loop turtlebot3_multi_robot --symlink-install --cmake-clean-cache
 
 # Source the workspace setup again to ensure the environment is updated
 source ./install/setup.bash
@@ -65,10 +60,9 @@ source ./install/setup.bash
 if docker ps --filter "name=mape_k_redis" --format "{{.Names}}" | grep -q "^mape_k_redis$"; then
   docker stop mape_k_redis
   docker rm mape_k_redis
-
 #Launch new Docker container of the Redis image
-docker run -d --name mape_k_redis -p 6379:6379 redis:latest
 fi
+docker run -d --name mape_k_redis -p 6379:6379 redis:latest
 
 # Ensure ROS 2 binaries are in the PATH again
 export PATH=$PATH:/opt/ros/humble/bin
