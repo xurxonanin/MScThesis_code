@@ -3,13 +3,14 @@ from rclpy.node import Node
 from std_msgs.msg import String
 import threading
 import time
+from rclpy.qos import QoSPresetProfiles
 
 class BaseSlave(Node):
     def __init__(self, node_name ="slave"):
         super().__init__(node_name)
         self.state = 'idle'
         self.namespace = self.get_namespace().strip('/')
-        self.create_subscription(String, f'/{self.namespace}/{node_name}/execution_command', self.command_callback)
+        self.create_subscription(String, f'/{self.namespace}/{node_name}/execution_command', self.command_callback, QoSPresetProfiles.SYSTEM_DEFAULT.value)
         self.worker_thread = threading.Thread(target=self.worker_loop, daemon=True)
         self.worker_thread.start()
 

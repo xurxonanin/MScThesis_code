@@ -7,6 +7,8 @@ from mape_k_loop.execute import Execute
 import sys
 import rtamt
 from std_msgs.msg import String, Bool
+from rclpy.qos import QoSPresetProfiles
+from functools import partial # For Python 3.8 and above, you can use functools.partial to pass the status argument
 
 # Master Node for MAPE-K loop
 class MAPE_K(Node):
@@ -36,34 +38,30 @@ class MAPE_K(Node):
 
         self.monitor_listener = self.create_subscription(
             Bool,
-            '/{self.namespace}/monitor_finished',
-            self.status_callback,
-            1,
-            status = self.monitor_state
+            f'/{self.namespace}/monitor_finished',
+            partial(self.status_callback, status=self.monitor_state),
+            QoSPresetProfiles.SYSTEM_DEFAULT.value
         )
 
         self.analysis_listener = self.create_subscription(
             Bool,
-            '/{self.namespace}/analysis_finished',
-            self.status_callback,
-            1,
-            status = self.analyze_state
+            f'/{self.namespace}/analysis_finished',
+            partial(self.status_callback, status=self.analyze_state),
+            QoSPresetProfiles.SYSTEM_DEFAULT.value
         )
 
         self.planning_listener = self.create_subscription(
             Bool,
-            '/{self.namespace}/planning_finished',
-            self.status_callback,
-            1,
-            status = self.planning_state
+            f'/{self.namespace}/planning_finished',
+            partial(self.status_callback, status=self.planning_state),
+            QoSPresetProfiles.SYSTEM_DEFAULT.value
         )
 
         self.execute_listener = self.create_subscription(
             Bool,
-            '/{self.namespace}/execute_finished',
-            self.status_callback,
-            1,
-            status = self.execute_state
+            f'/{self.namespace}/execute_finished',
+            partial(self.status_callback, status=self.execute_state),
+            QoSPresetProfiles.SYSTEM_DEFAULT.value
         )
         self.create_timer(0.5, self.switch_state)
 

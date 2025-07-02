@@ -35,7 +35,6 @@ def scan_to_mask(scan):
 class Analyze(BaseSlave):
     def __init__(self):
         super().__init__(f'analyze')
-        
         self.namespace = self.get_namespace().strip('/')
         self.redis_client = redis.Redis(host='localhost', port=6379, decode_responses=True)
         if self.redis_client.ping():

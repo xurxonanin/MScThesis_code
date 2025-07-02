@@ -14,7 +14,7 @@ import re
 from mape_k_interfaces.srv import CheckAnomaly
 from rclpy.callback_groups import MutuallyExclusiveCallbackGroup
 from mape_k_loop.base_slave import BaseSlave
-
+from rclpy.qos import QoSPresetProfiles
 class Planning(BaseSlave):
     def __init__(self):
         super().__init__('planning')
@@ -46,7 +46,7 @@ class Planning(BaseSlave):
             String,
             f'{self.namespace}/anomaly',
             self.anomaly_callback,
-            1
+            QoSPresetProfiles.SYSTEM_DEFAULT.value
         )
         # read_from_db yet to be implemented
         self.get_logger().info('Plan node started')

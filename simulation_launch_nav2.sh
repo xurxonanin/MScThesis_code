@@ -51,7 +51,7 @@ fi
 # Build the workspace
 
 
-colcon build --packages-select mape_k_interfaces mape_k_loop turtlebot3_multi_robot --symlink-install --cmake-clean-cache
+colcon build --packages-select mape_k_interfaces mape_k_loop turtlebot3_multi_robot --event-handlers "console_direct+" --symlink-install --cmake-clean-cache
 
 # Source the workspace setup again to ensure the environment is updated
 source ./install/setup.bash

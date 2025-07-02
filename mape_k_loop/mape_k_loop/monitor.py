@@ -16,14 +16,14 @@ from threading import Lock
 import signal
 import sys
 from mape_k_loop.base_slave import BaseSlave
-
+from rclpy.qos import QoSPresetProfiles
 class Monitor(BaseSlave):
     def __init__(self):
         super().__init__(f'monitor')
         self.laser_sub = self.create_subscription(LaserScan, 
             'scan',
             self.laser_callback, 
-            2
+            QoSPresetProfiles.SYSTEM_DEFAULT.value
         )
         
         self.namespace = self.get_namespace().strip('/')
@@ -31,12 +31,12 @@ class Monitor(BaseSlave):
             String,
             f'/{self.namespace}/monitor/execution_command',
             self.command_callback,
-            1
+            QoSPresetProfiles.SYSTEM_DEFAULT.value
         )
         self.odom_sub = self.create_subscription(Odometry,
             'odom',
             self.odom_callback, 
-            2
+            QoSPresetProfiles.SYSTEM_DEFAULT.value
         )
         self.get_logger().info(f'/monitor node started')
         self.finished_publisher = self.create_publisher(
