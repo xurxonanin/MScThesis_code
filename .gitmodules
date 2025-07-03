@@ -4,3 +4,7 @@
 [submodule "lidar-occlusion"]
 	path = lidar-occlusion
 	url = git@github.com:xurxonanin/Lidar-Occlusion.git
+[submodule "turtlebot3"]
+	path = turtlebot3
+	url = https://github.com/ROBOTIS-GIT/turtlebot3.git
+	branch = humble
