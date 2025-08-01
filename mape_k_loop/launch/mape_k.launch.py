@@ -50,4 +50,16 @@ def generate_launch_description():
             )
         )
 
+        nodes.append(
+            Node(
+                package='mape_k_loop',
+                executable='execute',
+                name=f'execute{namespace}',
+                namespace=namespace,
+                output='screen',
+                parameters=[{'use_sim_time': True}]
+            )
+        )
+
+
     return LaunchDescription(nodes)

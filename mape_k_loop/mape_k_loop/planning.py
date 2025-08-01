@@ -7,14 +7,11 @@ import rclpy
 from rclpy.node import Node
 import redis
 from sensor_msgs.msg import LaserScan
-import json
-import signal
-from std_msgs.msg import String
+from std_msgs.msg import String, Bool
 import re
 from mape_k_interfaces.srv import CheckAnomaly
 from rclpy.callback_groups import MutuallyExclusiveCallbackGroup
 from mape_k_loop.base_slave import BaseSlave
-from rclpy.qos import QoSPresetProfiles
 class Planning(BaseSlave):
     def __init__(self):
         super().__init__('planning')
@@ -25,18 +22,13 @@ class Planning(BaseSlave):
             letters, numbers = match.groups()
             numbers = (int(numbers) % 2) + 1  # Parse numbers to integer before performing modulo operation
             self.namespace_companion = f'{letters}{numbers}'
-        self.redis_client = redis.Redis(host='localhost', port=6379, decode_responses=True)
-        if self.redis_client.ping():
-            self.get_logger().info('Connected to Redis server')
-        else:
-            # If the database connection fails, set up a signal handler to stop execution
-            self.get_logger().error('Failed to connect to Redis server')
-            def stop_execution(signal, frame):
-                self.get_logger().info('Stopping execution...') 
-                rclpy.shutdown()
-                exit(0)
-
-            signal.signal(signal.SIGINT, stop_execution)
+        try:
+            self.redis_client = redis.Redis(host='localhost', port=6379, decode_responses=True)    
+            if not self.redis_client.ping():
+                self.get_logger().info('Connected to Redis server')
+        except ConnectionError as e:
+            self.get_logger().error(f'Failed to connect to Redis server: {e}')
+            raise RuntimeError("Redis unavailable, aborting Planning node") from e
         self.get_logger().info(f'Companion namespace: {self.namespace_companion}')
         self.anomaly_client = self.create_client(CheckAnomaly,
             f'/{self.namespace_companion}/check_anomaly',
@@ -46,7 +38,7 @@ class Planning(BaseSlave):
             String,
             f'{self.namespace}/anomaly',
             self.anomaly_callback,
-            QoSPresetProfiles.SYSTEM_DEFAULT.value
+            self.qos
         )
         # read_from_db yet to be implemented
         self.get_logger().info('Plan node started')
@@ -61,21 +53,25 @@ class Planning(BaseSlave):
         # Use a RTAMT monitor to check if the latency is small enough and the battery is enough
         # This will be the decision maker.
     def do_task(self):
-        request = CheckAnomaly.Request()
-        self.get_logger().info('Calling companion to check its state...')
-        future = self.anomaly_client.call_async(request)
-        rclpy.spin_until_future_complete(self, future)
-        if future.done() and not future.cancelled():
-            self.get_logger().info('Companion state retrieved successfully.')
-        else:
-            self.get_logger().error('Failed to retrieve companion state.')
+        req = CheckAnomaly.Request()
+        self.get_logger().info('Polling companion for anomaly state…')
+        future = self.anomaly_client.call_async(req)
+
+        # Block until we get an answer (or timeout)
+        rclpy.spin_until_future_complete(self, future, timeout_sec=2.0)
+        if not future.done():
+            self.get_logger().warn('Planning: no response from companion, will retry next cycle')
             return False
-        if future.result() is not None:
-            return future.result().anomaly
+
+        companion_anomaly = future.result().anomaly
+        if companion_anomaly:
+            self.get_logger().info('Planning: companion has an anomaly → recompute plan')
+            # ← insert your replanning logic here
         else:
-            raise RuntimeError(
-                'Service call failed: %r' % (future.exception(),)
-            )
+            self.get_logger().info('Planning: no anomaly, stick to current plan')
+            # ← optional default plan
+        return True
+        
     
 
     def anomaly_callback(self, msg):
@@ -88,17 +84,12 @@ class Planning(BaseSlave):
             peer_anomaly_present = self.retrieve_peer_state()
         except Exception as e:
             self.get_logger().error(f'Failed to retrieve state: {e}')
-            return
+            
         if peer_anomaly_present:
             self.get_logger().info('Anomaly detected. Change the plan.')
         
 def main(args=None):
     rclpy.init(args=args)
-    planning = Planning()
-    executor = rclpy.executors.SingleThreadedExecutor()
-    executor.add_node(planning)
-    try:
-        executor.spin()
-    finally:
-        rclpy.spin(planning)
-        rclpy.shutdown()
+    monitor = Planning()
+    rclpy.spin(monitor)
+    rclpy.shutdown()

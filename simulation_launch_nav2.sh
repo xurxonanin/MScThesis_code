@@ -49,21 +49,28 @@ if ! command -v colcon &> /dev/null; then
 fi
 
 # Build the workspace
+colcon build --packages-up-to turtlebot3_navigation2 --cmake-clean-cache
 
-
-colcon build --packages-select mape_k_interfaces mape_k_loop turtlebot3_multi_robot --event-handlers "console_direct+" --symlink-install --cmake-clean-cache
-
+# Detailed colcon output: colcon build --packages-select mape_k_interfaces mape_k_loop turtlebot3_multi_robot --event-handlers "console_direct+" --symlink-install 
+colcon build --packages-select mape_k_interfaces mape_k_loop turtlebot3_multi_robot --symlink-install 
 # Source the workspace setup again to ensure the environment is updated
 source ./install/setup.bash
 
 # Check if a Docker container with the name "mape_k_redis" is already running
-if docker ps --filter "name=mape_k_redis" --format "{{.Names}}" | grep -q "^mape_k_redis$"; then
+if docker ps -a --filter "name=mape_k_redis" --format "{{.Names}}" | grep -q "^mape_k_redis$"; then
   docker stop mape_k_redis
   docker rm mape_k_redis
 #Launch new Docker container of the Redis image
 fi
-docker run -d --name mape_k_redis -p 6379:6379 redis:latest
-
+docker run -d --name mape_k_redis -p 6379:6379 \
+  -v $(pwd)/redis.conf:/usr/local/etc/redis/redis.conf\
+  redis:latest \
+  redis-server /usr/local/etc/redis/redis.conf
+echo -n "Waiting for Redis to come up… "
+until docker exec mape_k_redis redis-cli ping 2>/dev/null | grep -q PONG; do
+  echo -n "."; sleep 0.5
+done
+echo " OK"
 # Ensure ROS 2 binaries are in the PATH again
 export PATH=$PATH:/opt/ros/humble/bin
 

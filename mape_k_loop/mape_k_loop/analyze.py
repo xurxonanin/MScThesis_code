@@ -7,11 +7,10 @@ import rclpy
 from rclpy.node import Node
 import redis
 import json
-import signal
 import numpy as np
 from fractions import Fraction
 from threading import Lock
-from std_msgs.msg import String
+from std_msgs.msg import String, Bool
 from mape_k_interfaces.srv import CheckAnomaly
 from mape_k_loop.base_slave import BaseSlave
 
@@ -23,7 +22,7 @@ except (ValueError, ImportError):
     from mape_k_loop.lidarocclusion.sliding_lidar_masks import sliding_lidar_mask
 
 
-
+WINDOW_SIZE = 5
 SIMULATED_OCCLUSION = (0,Fraction(1, 4))
 def scan_to_mask(scan):
     ranges = np.array(scan['ranges'])
@@ -37,17 +36,13 @@ class Analyze(BaseSlave):
         super().__init__(f'analyze')
         self.namespace = self.get_namespace().strip('/')
         self.redis_client = redis.Redis(host='localhost', port=6379, decode_responses=True)
-        if self.redis_client.ping():
-            self.get_logger().info('Connected to Redis server')
-        else:
-            # If the database connection fails, set up a signal handler to stop execution
-            self.get_logger().error('Failed to connect to Redis server')
-            def stop_execution(signal, frame):
-                self.get_logger().info('Stopping execution...')
-                rclpy.shutdown()
-                exit(0)
-
-            signal.signal(signal.SIGINT, stop_execution)
+        try:
+            self.redis_client = redis.Redis(host='localhost', port=6379, decode_responses=True)    
+            if not self.redis_client.ping():
+                self.get_logger().info('Connected to Redis server')
+        except ConnectionError as e:
+            self.get_logger().error(f'Failed to connect to Redis server: {e}')
+            raise RuntimeError("Redis unavailable, aborting Analyze node") from e
         self.get_logger().info('Analyze node started')
         self.scans = []
         self.anomaly = False
@@ -65,54 +60,53 @@ class Analyze(BaseSlave):
                 window_size=5,
                 cutoff=0.5
             )
-        self.scans_mutex = Lock()
-        self.anomaly_topic = self.create_publisher(String, f'{self.namespace}/anomaly', 10)
+        self.anomaly_topic = self.create_publisher(String, f'{self.namespace}/anomaly', self.qos)
         
     def check_anomaly_callback (self, _, response):
         response.anomaly = self.anomaly
         return response
 
-    # Add a timer callback to periodically read from database
     def do_task(self):
+        # Read Latest Scan
         current_scan = self.redis_client.hgetall(f'current_map_{self.namespace}')
         if not current_scan:
             self.get_logger().warn('No scan data found in Redis')
-            return
+            return False
         lidar_info  = json.loads(current_scan['scan'])
         
         # Convert the scan to a mask
+        self.get_logger().info(f"Current_scan: {len(lidar_info)}")
+    
+        self.scans.append(lidar_info)
+        if len(self.scans) < WINDOW_SIZE:
+            self.get_logger().info(f"Waiting for {WINDOW_SIZE} scans (have {len(self.scans)})")
+            return False
+        sliding_mask = next(self._sliding_lidar_mask)
+        simulated_occlusion = None        
+        ignore_lidar_region = BoolLidarMask(
+            [(3 * np.pi / 4, 5 * np.pi / 4)],
+            sliding_mask.base_angle,
+        )
+
+        sliding_mask  = sliding_mask | ignore_lidar_region
+        if simulated_occlusion:
+            sliding_mask = sliding_mask & simulated_occlusion
+        else:
+            sliding_mask = sliding_mask
+
+        if sliding_mask._values.all():
+            self.anomaly = False
+            self.anomaly_init += 1
+        else:
+            self.anomaly = True
+            self.get_logger().info('Anomaly detected!')
+            self.redis_client.hset(f'anomaly_{self.namespace}', mapping={
+                'anomaly': json.dumps(True),
+                'scan': json.dumps(lidar_info)
+            })
+            self.anomaly_topic.publish(String(data=json.dumps(lidar_info)))
         
-        with self.scans_mutex:
-            self.scans.append(lidar_info)
-            sliding_mask = next(self._sliding_lidar_mask)
-            simulated_occlusion = None
-            if self.anomaly_init >= 15:
-                simulated_occlusion = BoolLidarMask(
-                    [(0.0, Fraction(1,8)*np.pi)],
-                    base_angle= sliding_mask.base_angle,
-                )            
-            ignore_lidar_region = BoolLidarMask(
-                [(3 * np.pi / 4, 5 * np.pi / 4)],
-                sliding_mask.base_angle,
-            )
-
-            sliding_mask  = sliding_mask | ignore_lidar_region
-            if simulated_occlusion:
-                sliding_mask = sliding_mask & simulated_occlusion
-            else:
-                sliding_mask = sliding_mask
-
-            if sliding_mask._values.all():
-                self.anomaly = False
-                self.anomaly_init += 1
-            else:
-                self.anomaly = True
-                self.get_logger().info('Anomaly detected!')
-                self.redis_client.hset(f'anomaly_{self.namespace}', mapping={
-                    'anomaly': json.dumps(True),
-                    'scan': json.dumps(lidar_info)
-                })
-                self.anomaly_topic.publish(String(data=json.dumps(lidar_info)))
+        return True
             
         
             

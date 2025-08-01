@@ -26,6 +26,7 @@ setup(
             'monitor = mape_k_loop.monitor:main',
             'analyze = mape_k_loop.analyze:main',
             'planning = mape_k_loop.planning:main',
+            'execute = mape_k_loop.execute:main',
         ],
     },
 )

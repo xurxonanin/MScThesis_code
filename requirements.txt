@@ -1,6 +1,6 @@
 rtamt
 lxml
-numpy
+numpy==1.25.2
 catkin_pkg
 portion==2.4.2
 pytest==8.2.0

@@ -12,8 +12,8 @@ def generate_launch_description():
 
     # Launch configuration variables specific to simulation
     use_sim_time = LaunchConfiguration('use_sim_time', default='true')
-    enable_drive = LaunchConfiguration('enable_drive', default='false')
-    enable_rviz = LaunchConfiguration('enable_rviz', default='false')
+    enable_drive = LaunchConfiguration('enable_drive', default='true')
+    enable_rviz = LaunchConfiguration('enable_rviz', default='true')
 
     # Include the Gazebo simulation launch file
     gazebo_launch = IncludeLaunchDescription(
@@ -28,7 +28,7 @@ def generate_launch_description():
     )
 
     # Include the monitor position launch file
-    monitor_launch = IncludeLaunchDescription(
+    loop_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             os.path.join(mape_k_loop_dir, 'launch', 'mape_k.launch.py')
         )
@@ -36,5 +36,5 @@ def generate_launch_description():
 
     return LaunchDescription([
         gazebo_launch,
-        monitor_launch
+        loop_launch
     ])
