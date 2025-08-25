@@ -49,10 +49,9 @@ if ! command -v colcon &> /dev/null; then
 fi
 
 # Build the workspace
-colcon build --packages-up-to turtlebot3_navigation2 --cmake-clean-cache
 
 # Detailed colcon output: colcon build --packages-select mape_k_interfaces mape_k_loop turtlebot3_multi_robot --event-handlers "console_direct+" --symlink-install 
-colcon build --packages-select mape_k_interfaces mape_k_loop turtlebot3_multi_robot --symlink-install 
+colcon build --packages-select mape_k_interfaces mape_k_loop turtlebot3_multi_robot movement odom_tf_broadcaster --symlink-install 
 # Source the workspace setup again to ensure the environment is updated
 source ./install/setup.bash
 
